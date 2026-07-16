@@ -1,0 +1,44 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    # This crate is developed as a git submodule of dgtlrift/cddlc and has
+    # path dependencies on sibling crates (e.g. `{ path = "../cddlc-parser" }`),
+    # so it can't build standalone from a single-repo checkout. Instead, check
+    # out the parent workspace (with all submodules) and swap this one
+    # submodule to the commit that triggered this run, then build/test just
+    # this package from within that workspace.
+    steps:
+    - name: Check out parent workspace
+      uses: actions/checkout@v4
+      with:
+        repository: dgtlrift/cddlc
+        submodules: recursive
+        path: workspace
+
+    - name: Point cddlc-validate at this commit
+      working-directory: workspace/crates/cddlc-validate
+      run: |
+        git fetch --depth=1 origin ${{ github.sha }}
+        git checkout ${{ github.sha }}
+
+    - name: Build
+      working-directory: workspace
+      run: cargo build -p cddlc-validate --verbose
+
+    - name: Run tests
+      working-directory: workspace
+      run: cargo test -p cddlc-validate --verbose
