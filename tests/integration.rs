@@ -278,3 +278,21 @@ fn range_operator_enforces_both_bounds() {
     let errors = assert_fails(&m, "byte", &json("300"));
     assert!(errors.iter().any(|e| e.message.contains("above the maximum 255")), "{errors:?}");
 }
+
+// ── Literal-valued fields and union discrimination ───────────────────────────
+
+const LITERALS: &str = r#"
+record = start / end
+start = { t: uint, cat: "kernel", type: "SimStart" }
+end = { t: uint, cat: "kernel", type: "SimEnd", reason: "until" / "queue-empty" }
+"#;
+
+#[test]
+fn literal_fields_are_enforced() {
+    let m = lower(LITERALS);
+    assert_ok(&m, "record", &json(r#"{"t":1,"cat":"kernel","type":"SimStart"}"#));
+    assert_ok(&m, "record", &json(r#"{"t":1,"cat":"kernel","type":"SimEnd","reason":"queue-empty"}"#));
+    assert_fails(&m, "record", &json(r#"{"t":1,"cat":"rx","type":"SimStart"}"#));
+    assert_fails(&m, "record", &json(r#"{"t":1,"cat":"kernel","type":"SimEnd","reason":"bogus"}"#));
+    assert_fails(&m, "start", &json(r#"{"t":1,"cat":"kernel","type":"SimEnd"}"#));
+}
